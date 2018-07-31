@@ -23,7 +23,7 @@ endif (MINGW)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 
-#include(deps/uv.cmake)
+include(deps/uv.cmake)
 if (BUILD_MODULE)
   add_definitions( -DBUILDING_UV_SHARED )
 endif (BUILD_MODULE)
@@ -69,18 +69,18 @@ if(WIN32)
 elseif("${CMAKE_SYSTEM_NAME}" MATCHES "Linux")
   target_link_libraries(luv ${LIBUV_LIBRARIES} rt)
 else()
-  target_link_libraries(luv ${LIBUV_LIBRARIES})
+  target_link_libraries(luv ${LIBUV_LIBRARIES} ${LUA_LIBRARIES})
 endif()
 
 if (CMAKE_INSTALL_PREFIX)
   install(TARGETS luv
-    ARCHIVE DESTINATION "${INSTALL_LIB_DIR}"
-    LIBRARY DESTINATION "${INSTALL_LIB_DIR}"
+    LIBRARY DESTINATION ${LIBDIR}
+    RUNTIME DESTINATION ${LUA_BINDIR}
   )
   if (NOT BUILD_MODULE)
     install(
       FILES src/luv.h src/util.h src/lhandle.h src/lreq.h
-      DESTINATION "${INSTALL_INC_DIR}"
+      DESTINATION "${LUA_INCDIR}"
     )
   endif (NOT BUILD_MODULE)
 endif (CMAKE_INSTALL_PREFIX)
