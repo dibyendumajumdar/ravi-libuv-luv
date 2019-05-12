@@ -23,10 +23,11 @@ endif (MINGW)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 
-include(deps/uv.cmake)
-if (BUILD_MODULE)
-  add_definitions( -DBUILDING_UV_SHARED )
-endif (BUILD_MODULE)
+include_directories(deps/libuv/include)
+add_subdirectory(deps/libuv EXCLUDE_FROM_ALL)
+  if (BUILD_MODULE)
+    add_definitions( -DBUILDING_UV_SHARED )
+  endif (BUILD_MODULE)
 set(LIBUV_LIBRARIES uv)
 
 find_package(Lua REQUIRED)
