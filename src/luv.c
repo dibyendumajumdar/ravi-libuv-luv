@@ -179,6 +179,10 @@ static const luaL_Reg luv_functions[] = {
   {"udp_try_send", luv_udp_try_send},
   {"udp_recv_start", luv_udp_recv_start},
   {"udp_recv_stop", luv_udp_recv_stop},
+#if LUV_UV_VERSION_GEQ(1, 27, 0)
+  {"udp_connect", luv_udp_connect},
+  {"udp_getpeername", luv_udp_getpeername},
+#endif
 
   // fs_event.c
   {"new_fs_event", luv_new_fs_event},
@@ -224,6 +228,11 @@ static const luaL_Reg luv_functions[] = {
   {"fs_fchown", luv_fs_fchown},
 #if LUV_UV_VERSION_GEQ(1, 14, 0)
   {"fs_copyfile", luv_fs_copyfile },
+#endif
+#if LUV_UV_VERSION_GEQ(1, 28, 0)
+  {"fs_opendir", luv_fs_opendir},
+  {"fs_readdir", luv_fs_readdir},
+  {"fs_closedir", luv_fs_closedir},
 #endif
 
   // dns.c
@@ -274,11 +283,17 @@ static const luaL_Reg luv_functions[] = {
   {"os_getppid", luv_os_getppid },
 #endif
 #if LUV_UV_VERSION_GEQ(1, 18, 0)
-  {"os_getpid", luv_os_getpid },
+  {"os_getpid", luv_os_getpid},
 #endif
 #if LUV_UV_VERSION_GEQ(1, 23, 0)
-  {"os_getpriority", luv_os_getpriority },
-  {"os_setpriority", luv_os_setpriority },
+  {"os_getpriority", luv_os_getpriority},
+  {"os_setpriority", luv_os_setpriority},
+#endif
+#if LUV_UV_VERSION_GEQ(1, 25, 0)
+  {"os_uname", luv_os_uname},
+#endif
+#if LUV_UV_VERSION_GEQ(1, 28, 0)
+  {"gettimeofday", luv_gettimeofday},
 #endif
 
   // thread.c
@@ -433,6 +448,10 @@ static const luaL_Reg luv_udp_methods[] = {
   {"try_send", luv_udp_try_send},
   {"recv_start", luv_udp_recv_start},
   {"recv_stop", luv_udp_recv_stop},
+#if LUV_UV_VERSION_GEQ(1, 27, 0)
+  {"connect", luv_udp_connect},
+  {"getpeername", luv_udp_getpeername},
+#endif
   {NULL, NULL}
 };
 

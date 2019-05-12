@@ -82,12 +82,25 @@ local server = create_server("0.0.0.0", 0, function (client)
   end)
 end)
 
-print("TCP Echo serverr listening on port " .. server:getsockname().port)
+print("TCP Echo server listening on port " .. server:getsockname().port)
 
 uv.run()
 ```
 
 More examples can be found in the [examples](examples) and [tests](tests) folders.
+
+## Luarocks
+
+Luv is available on Luarocks [here](https://luarocks.org/modules/creationix/luv). It can be installed via:
+
+```
+luarocks install luv
+```
+
+Note: To require `luv` using `require 'uv'` (to maintain compatibility with how luv is required in [luvi](https://github.com/luvit/luvi)) create a `uv.lua` with the contents:
+```
+return require 'luv'
+```
 
 ## Building From Source
 
