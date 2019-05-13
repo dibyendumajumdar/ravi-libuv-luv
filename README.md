@@ -1,5 +1,5 @@
-luv - Libuv bindinngs for Ravi / Lua 5.3
-========================================
+luv - Libuv bindings for Ravi / Lua 5.3
+=======================================
 
 This library makes libuv available to lua scripts.  It was made for the [luvit](http://luvit.io/) project but should usable from nearly any lua project. 
 
