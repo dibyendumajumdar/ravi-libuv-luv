@@ -1,7 +1,7 @@
 luv - Libuv bindings for Ravi / Lua 5.3
 =======================================
 
-This library makes libuv available to lua scripts.  It was made for the [luvit](http://luvit.io/) project but should usable from nearly any lua project. 
+This library makes libuv available to lua scripts.  It was made for the [luvit](http://luvit.io/) project but should usable from nearly any lua project. Currently this library supports Libuv v1.28.0.
 
 The library can be used by multiple threads at once.  Each thread is assumed to load the library from a different `lua_State`.  Luv will create a unique `uv_loop_t` for each state.  You can't share uv handles between states/loops.
 
