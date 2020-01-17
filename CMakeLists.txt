@@ -30,7 +30,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 #  endif (BUILD_MODULE)
 #set(LIBUV_LIBRARIES uv)
 
-find_package(Lua REQUIRED)
+include(${CMAKE_INSTALL_PREFIX}/cmake/lua-config.cmake)
 find_package(LIBUV REQUIRED)
 if (LIBUV_FOUND)
   include_directories(${LIBUV_INCLUDE_DIR})
