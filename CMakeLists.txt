@@ -32,9 +32,7 @@ set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 
 include(${CMAKE_INSTALL_PREFIX}/cmake/lua-config.cmake)
 find_package(LIBUV REQUIRED)
-if (LIBUV_FOUND)
-  include_directories(${LIBUV_INCLUDE_DIR})
-endif (LIBUV_FOUND)
+include_directories(${LIBUV_INCLUDE_DIR})
 
 MESSAGE(STATUS "LUA_LIBDIR: " ${LUA_LIBDIR})
 MESSAGE(STATUS "LUA_INCDIR: " ${LUA_INCDIR})
