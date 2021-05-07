@@ -25,7 +25,7 @@ if "%LUA%"=="luajit" (
 :: Now we declare a scope
 Setlocal EnableDelayedExpansion EnableExtensions
 
-if not defined LUAROCKS_URL set LUAROCKS_URL=https://keplerproject.github.io/luarocks/releases
+if not defined LUAROCKS_URL set LUAROCKS_URL=https://luarocks.github.io/luarocks/releases
 if not defined LUAROCKS_REPO set LUAROCKS_REPO=https://luarocks.org
 if not defined LUA_URL set LUA_URL=http://www.lua.org/ftp
 if defined NOCOMPAT (
@@ -91,7 +91,7 @@ if "%LUA%"=="luajit" (
 			cd !lj_source_folder!\src
 		)
 		:: Compiles LuaJIT
-		if "%Configuration%"=="MinGW" (
+		if "%COMPILER%"=="MinGW" (
 			call mingw32-make
 		) else (
 			call msvcbuild.bat
@@ -163,15 +163,15 @@ if not exist "%LR_ROOT%" (
 	)
 
 	cd downloads\luarocks-%LUAROCKS_VER%-win32
-	if "%Configuration%"=="MinGW" (
-		call install.bat /LUA %LUA_DIR% /Q /LV %LUA_SHORTV% /P "%LUAROCKS_INSTALL%" /TREE "%LR_SYSTREE%" /MW
+	if "%COMPILER%"=="MinGW" (
+		call install.bat /LUA %LUA_DIR% /Q /LV %LUA_SHORTV% /P "%LUAROCKS_INSTALL%" /TREE "%LR_SYSTREE%" /CONFIG "%LUAROCKS_INSTALL%" /MW
 	) else (
-		call install.bat /LUA %LUA_DIR% /Q /LV %LUA_SHORTV% /P "%LUAROCKS_INSTALL%" /TREE "%LR_SYSTREE%"
+		call install.bat /LUA %LUA_DIR% /Q /LV %LUA_SHORTV% /P "%LUAROCKS_INSTALL%" /TREE "%LR_SYSTREE%" /CONFIG "%LUAROCKS_INSTALL%"
 	)
 
 	:: Configures LuaRocks to instruct CMake the correct generator to use. Else, CMake will pick the highest
 	:: Visual Studio version installed
-	if "%Configuration%"=="MinGW" (
+	if "%COMPILER%"=="MinGW" (
 		echo cmake_generator = "MinGW Makefiles" >> %LUAROCKS_INSTALL%\config-%LUA_SHORTV%.lua
 	) else (
 		set MSVS_GENERATORS[2008]=Visual Studio 9 2008
@@ -179,9 +179,14 @@ if not exist "%LR_ROOT%" (
 		set MSVS_GENERATORS[2012]=Visual Studio 11 2012
 		set MSVS_GENERATORS[2013]=Visual Studio 12 2013
 		set MSVS_GENERATORS[2015]=Visual Studio 14 2015
+		set MSVS_GENERATORS[2017]=Visual Studio 15 2017
+		set MSVS_GENERATORS[2019]=Visual Studio 16 2019
 
-		set CMAKE_GENERATOR=!MSVS_GENERATORS[%Configuration%]!
-		if "%platform%" EQU "x64" (set CMAKE_GENERATOR=!CMAKE_GENERATOR! Win64)
+		set CMAKE_GENERATOR=!MSVS_GENERATORS[%APPVEYOR_BUILD_WORKER_IMAGE:~14,4%]!
+		:: Starting with MSVC 2019, CMake uses -A option to specify arch rather than Win64 suffix
+		if %APPVEYOR_BUILD_WORKER_IMAGE:~14,4% leq 2017 (
+			if "%platform%" EQU "x64" (set CMAKE_GENERATOR=!CMAKE_GENERATOR! Win64)
+		)
 
 		echo cmake_generator = "!CMAKE_GENERATOR!" >> %LUAROCKS_INSTALL%\config-%LUA_SHORTV%.lua
 	)

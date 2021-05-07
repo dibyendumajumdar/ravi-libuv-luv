@@ -14,7 +14,7 @@
  *  limitations under the License.
  *
  */
-#include "luv.h"
+#include "private.h"
 
 static uv_timer_t* luv_check_timer(lua_State* L, int index) {
   uv_timer_t* handle = (uv_timer_t*) luv_checkudata(L, index, "uv_timer");
@@ -23,19 +23,20 @@ static uv_timer_t* luv_check_timer(lua_State* L, int index) {
 }
 
 static int luv_new_timer(lua_State* L) {
+  luv_ctx_t* ctx = luv_context(L);
   uv_timer_t* handle = (uv_timer_t*) luv_newuserdata(L, sizeof(*handle));
-  int ret = uv_timer_init(luv_loop(L), handle);
+  int ret = uv_timer_init(ctx->loop, handle);
   if (ret < 0) {
     lua_pop(L, 1);
     return luv_error(L, ret);
   }
-  handle->data = luv_setup_handle(L);
+  handle->data = luv_setup_handle(L, ctx);
   return 1;
 }
 
 static void luv_timer_cb(uv_timer_t* handle) {
-  lua_State* L = luv_state(handle->loop);
   luv_handle_t* data = (luv_handle_t*)handle->data;
+  lua_State* L = data->ctx->L;
   luv_call_callback(L, data, LUV_TIMEOUT, 0);
 }
 
@@ -48,25 +49,19 @@ static int luv_timer_start(lua_State* L) {
   repeat = luaL_checkinteger(L, 3);
   luv_check_callback(L, (luv_handle_t*)handle->data, LUV_TIMEOUT, 4);
   ret = uv_timer_start(handle, luv_timer_cb, timeout, repeat);
-  if (ret < 0) return luv_error(L, ret);
-  lua_pushinteger(L, ret);
-  return 1;
+  return luv_result(L, ret);
 }
 
 static int luv_timer_stop(lua_State* L) {
   uv_timer_t* handle = luv_check_timer(L, 1);
   int ret = uv_timer_stop(handle);
-  if (ret < 0) return luv_error(L, ret);
-  lua_pushinteger(L, ret);
-  return 1;
+  return luv_result(L, ret);
 }
 
 static int luv_timer_again(lua_State* L) {
   uv_timer_t* handle = luv_check_timer(L, 1);
   int ret = uv_timer_again(handle);
-  if (ret < 0) return luv_error(L, ret);
-  lua_pushinteger(L, ret);
-  return 1;
+  return luv_result(L, ret);
 }
 
 static int luv_timer_set_repeat(lua_State* L) {
@@ -82,3 +77,13 @@ static int luv_timer_get_repeat(lua_State* L) {
   lua_pushinteger(L, repeat);
   return 1;
 }
+
+#if LUV_UV_VERSION_GEQ(1, 40, 0)
+static int luv_timer_get_due_in(lua_State* L) {
+  uv_timer_t* handle = luv_check_timer(L, 1);
+  uint64_t val = uv_timer_get_due_in(handle);
+  lua_pushinteger(L, val);
+  return 1;
+}
+#endif
+

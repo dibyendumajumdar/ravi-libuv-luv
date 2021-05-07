@@ -14,7 +14,7 @@
  *  limitations under the License.
  *
  */
-#include "luv.h"
+#include "private.h"
 
 static uv_prepare_t* luv_check_prepare(lua_State* L, int index) {
   uv_prepare_t* handle = (uv_prepare_t*)luv_checkudata(L, index, "uv_prepare");
@@ -23,19 +23,20 @@ static uv_prepare_t* luv_check_prepare(lua_State* L, int index) {
 }
 
 static int luv_new_prepare(lua_State* L) {
+  luv_ctx_t* ctx = luv_context(L);
   uv_prepare_t* handle = (uv_prepare_t*)luv_newuserdata(L, sizeof(*handle));
-  int ret = uv_prepare_init(luv_loop(L), handle);
+  int ret = uv_prepare_init(ctx->loop, handle);
   if (ret < 0) {
     lua_pop(L, 1);
     return luv_error(L, ret);
   }
-  handle->data = luv_setup_handle(L);
+  handle->data = luv_setup_handle(L, ctx);
   return 1;
 }
 
 static void luv_prepare_cb(uv_prepare_t* handle) {
-  lua_State* L = luv_state(handle->loop);
   luv_handle_t* data = (luv_handle_t*)handle->data;
+  lua_State* L = data->ctx->L;
   luv_call_callback(L, data, LUV_PREPARE, 0);
 }
 
@@ -44,16 +45,12 @@ static int luv_prepare_start(lua_State* L) {
   int ret;
   luv_check_callback(L, (luv_handle_t*)handle->data, LUV_PREPARE, 2);
   ret = uv_prepare_start(handle, luv_prepare_cb);
-  if (ret < 0) return luv_error(L, ret);
-  lua_pushinteger(L, ret);
-  return 1;
+  return luv_result(L, ret);
 }
 
 static int luv_prepare_stop(lua_State* L) {
   uv_prepare_t* handle = luv_check_prepare(L, 1);
   int ret = uv_prepare_stop(handle);
-  if (ret < 0) return luv_error(L, ret);
-  lua_pushinteger(L, ret);
-  return 1;
+  return luv_result(L, ret);
 }
 

@@ -14,7 +14,7 @@
  *  limitations under the License.
  *
  */
-#include "luv.h"
+#include "private.h"
 
 static void* luv_newuserdata(lua_State* L, size_t sz) {
   void* handle = malloc(sz);
@@ -74,9 +74,10 @@ static int luv_is_closing(lua_State* L) {
 }
 
 static void luv_close_cb(uv_handle_t* handle) {
-  lua_State* L = luv_state(handle->loop);
+  lua_State* L;
   luv_handle_t* data = (luv_handle_t*)handle->data;
   if (!data) return;
+  L = data->ctx->L;
   luv_call_callback(L, data, LUV_CLOSED, 0);
   luv_unref_handle(L, data);
 }
@@ -96,7 +97,8 @@ static int luv_close(lua_State* L) {
 static void luv_handle_free(uv_handle_t* handle) {
   luv_handle_t* data = (luv_handle_t*)handle->data;
   if (data) {
-    free(data->extra);
+    if (data->extra_gc)
+      data->extra_gc(data->extra);
     free(data);
   }
   free(handle);
@@ -150,34 +152,32 @@ static int luv_has_ref(lua_State* L) {
 
 static int luv_send_buffer_size(lua_State* L) {
   uv_handle_t* handle = luv_check_handle(L, 1);
-  int value;
+  int value = luaL_optinteger(L, 2, 0);
   int ret;
-  if (lua_isnoneornil(L, 2)) {
-    value = 0;
+  if (value == 0) { // get
+    ret = uv_send_buffer_size(handle, &value);
+    if (ret < 0) return luv_error(L, ret);
+    lua_pushinteger(L, value);
+    return 1;
+  } else { // set
+    ret = uv_send_buffer_size(handle, &value);
+    return luv_result(L, ret);
   }
-  else {
-    value = luaL_checkinteger(L, 2);
-  }
-  ret = uv_send_buffer_size(handle, &value);
-  if (ret < 0) return luv_error(L, ret);
-  lua_pushinteger(L, ret);
-  return 1;
 }
 
 static int luv_recv_buffer_size(lua_State* L) {
   uv_handle_t* handle = luv_check_handle(L, 1);
-  int value;
+  int value = luaL_optinteger(L, 2, 0);
   int ret;
-  if (lua_isnoneornil(L, 2)) {
-    value = 0;
+  if (value == 0) { // get
+    ret = uv_recv_buffer_size(handle, &value);
+    if (ret < 0) return luv_error(L, ret);
+    lua_pushinteger(L, value);
+    return 1;
+  } else { // set
+    ret = uv_recv_buffer_size(handle, &value);
+    return luv_result(L, ret);
   }
-  else {
-    value = luaL_checkinteger(L, 2);
-  }
-  ret = uv_recv_buffer_size(handle, &value);
-  if (ret < 0) return luv_error(L, ret);
-  lua_pushinteger(L, ret);
-  return 1;
 }
 
 static int luv_fileno(lua_State* L) {
@@ -188,3 +188,14 @@ static int luv_fileno(lua_State* L) {
   lua_pushinteger(L, (LUA_INTEGER)(ptrdiff_t)fd);
   return 1;
 }
+
+#if LUV_UV_VERSION_GEQ(1, 19, 0)
+static int luv_handle_get_type(lua_State* L) {
+  uv_handle_t* handle = luv_check_handle(L, 1);
+  uv_handle_type type = uv_handle_get_type(handle);
+  const char* type_name = uv_handle_type_name(type);
+  lua_pushstring(L, type_name);
+  lua_pushinteger(L, type);
+  return 2;
+}
+#endif

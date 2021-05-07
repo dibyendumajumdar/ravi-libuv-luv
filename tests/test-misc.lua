@@ -20,8 +20,12 @@ return require('lib/tap')(function (test)
   test("memory size", function (print, p, expect, uv)
     local rss = uv.resident_set_memory()
     local total = uv.get_total_memory()
+    local constrained = nil
+    if uv.get_constrained_memory then
+      constrained = uv.get_constrained_memory()
+    end
     local free = uv.get_free_memory()
-    p{rss=rss,total=total,free=free}
+    p{rss=rss,total=total,free=free, constrained=constrained}
     assert(rss < total)
   end)
 
@@ -61,17 +65,17 @@ return require('lib/tap')(function (test)
   test("uv.os_homedir", function (print, p, expect, uv)
     local path = assert(uv.os_homedir())
     p(path)
-  end)
+  end, "1.9.0")
 
   test("uv.os_tmpdir", function (print, p, expect, uv)
     local path = assert(uv.os_tmpdir())
     p(path)
-  end)
+  end, "1.9.0")
 
   test("uv.os_get_passwd", function (print, p, expect, uv)
     local passwd = assert(uv.os_get_passwd())
     p(passwd)
-  end)
+  end, "1.9.0")
 
   test("uv.cwd and uv.chdir", function (print, p, expect, uv)
     local old = assert(uv.cwd())
@@ -93,28 +97,70 @@ return require('lib/tap')(function (test)
   end)
 
   test("uv.os_uname", function(print, p, expect, uv)
-    local version = 0x10000 + 25*0x100 + 0
-    if uv.version() >= version then
-      local uname = assert(uv.os_uname())
-      p(uname)
-    else
-      print("skipped")
-    end
-  end)
+    local uname = assert(uv.os_uname())
+    p(uname)
+  end, "1.25.0")
 
   test("uv.gettimeofday", function(print, p, expect, uv)
-    local version = 0x10000 + 28*0x100 + 0
-    if uv.version() >= version then
-      local now = os.time()
-      local sec, usec = assert(uv.gettimeofday())
-      print('        os.time', now)
-      print('uv.gettimeofday',string.format("%f",sec+usec/10^9))
-      assert(sec >= now)
-      assert(type(sec)=='number')
-      assert(type(usec)=='number')
-    else
-      print("skipped")
-    end
+    local now = os.time()
+    local sec, usec = assert(uv.gettimeofday())
+    print('        os.time', now)
+    print('uv.gettimeofday',string.format("%f",sec+usec/10^9))
+    assert(type(sec)=='number')
+    assert(type(usec)=='number')
+  end, "1.28.0")
+
+  test("uv.os_environ", function(print, p, expect, uv)
+    local name, name2 = "LUV_TEST_FOO", "LUV_TEST_FOO2";
+    local value, value2 = "123456789", ""
+
+    assert(uv.os_setenv(name, value))
+    assert(uv.os_setenv(name2, value2))
+
+    local env = uv.os_environ();
+    assert(env[name]==value)
+    assert(env[name2]==value2)
+  end, "1.31.0")
+
+  test("uv.sleep", function(print, p, expect, uv)
+    local val = 1000
+    local begin = uv.now()
+
+    uv.sleep(val)
+    uv.update_time()
+
+    local now = uv.now()
+    assert(now-begin >= val)
   end)
+
+  test("uv.random async", function(print, p, expect, uv)
+    local len = 256
+    assert(uv.random(len, {}, expect(function(err, randomBytes)
+      assert(not err)
+      assert(#randomBytes == len)
+      -- this matches the LibUV test
+      -- it can theoretically fail but its very unlikely
+      assert(randomBytes ~= string.rep("\0", len))
+    end)))
+  end, "1.33.0")
+
+  test("uv.random sync", function(print, p, expect, uv)
+    local len = 256
+    local randomBytes = assert(uv.random(len))
+    assert(#randomBytes == len)
+    -- this matches the LibUV test
+    -- it can theoretically fail but its very unlikely
+    assert(randomBytes ~= string.rep("\0", len))
+  end, "1.33.0")
+
+  test("uv.random errors", function(print, p, expect, uv)
+    -- invalid flag
+    local _, err = uv.random(0, -1)
+    assert(err:match("^EINVAL"))
+
+    -- invalid len
+    _, err = uv.random(-1)
+    assert(err:match("^E2BIG"))
+  end, "1.33.0")
 
 end)

@@ -24,18 +24,20 @@ static uv_fs_poll_t* luv_check_fs_poll(lua_State* L, int index) {
 }
 
 static int luv_new_fs_poll(lua_State* L) {
+  luv_ctx_t* ctx = luv_context(L);
   uv_fs_poll_t* handle = (uv_fs_poll_t*)luv_newuserdata(L, sizeof(*handle));
-  int ret = uv_fs_poll_init(luv_loop(L), handle);
+  int ret = uv_fs_poll_init(ctx->loop, handle);
   if (ret < 0) {
     lua_pop(L, 1);
     return luv_error(L, ret);
   }
-  handle->data = luv_setup_handle(L);
+  handle->data = luv_setup_handle(L, ctx);
   return 1;
 }
 
 static void luv_fs_poll_cb(uv_fs_poll_t* handle, int status, const uv_stat_t* prev, const uv_stat_t* curr) {
-  lua_State* L = luv_state(handle->loop);
+  luv_handle_t* data = (luv_handle_t*)handle->data;
+  lua_State* L = data->ctx->L;
 
   // err
   luv_status(L, status);
@@ -66,17 +68,13 @@ static int luv_fs_poll_start(lua_State* L) {
   int ret;
   luv_check_callback(L, (luv_handle_t*)handle->data, LUV_FS_POLL, 4);
   ret = uv_fs_poll_start(handle, luv_fs_poll_cb, path, interval);
-  if (ret < 0) return luv_error(L, ret);
-  lua_pushinteger(L, ret);
-  return 1;
+  return luv_result(L, ret);
 }
 
 static int luv_fs_poll_stop(lua_State* L) {
   uv_fs_poll_t* handle = luv_check_fs_poll(L, 1);
   int ret = uv_fs_poll_stop(handle);
-  if (ret < 0) return luv_error(L, ret);
-  lua_pushinteger(L, ret);
-  return 1;
+  return luv_result(L, ret);
 }
 
 static int luv_fs_poll_getpath(lua_State* L) {

@@ -1,24 +1,47 @@
 return require('lib/tap')(function (test)
 
+  local isWindows = require('lib/utils').isWindows
+
+  local function errorAllowed(err)
+    -- allowed errors  from gnulib's test-getaddrinfo.c
+    return err == "EAI_AGAIN" -- offline/no network connection
+      or err == "EAI_NONAME"  -- IRIX returns this for "https"
+      or err == "EAI_SERVICE" -- Solaris returns this for "http"/"https"
+      or err == "EAI_NODATA"  -- AIX returns this for "https"
+  end
+
   test("Get all local http addresses", function (print, p, expect, uv)
     assert(uv.getaddrinfo(nil, "http", nil, expect(function (err, res)
-      p(res, #res)
+      if errorAllowed(err) then
+        print(err, "skipping")
+        return
+      end
       assert(not err, err)
+      p(res, #res)
       assert(res[1].port == 80)
     end)))
   end)
 
   test("Get all local http addresses sync", function (print, p, expect, uv)
-    local res = assert(uv.getaddrinfo(nil, "http"))
+    local res, errstr, err = uv.getaddrinfo(nil, "http")
+    if errorAllowed(err) then
+      print(err, "skipping")
+      return
+    end
+    assert(res, errstr)
     p(res, #res)
     assert(res[1].port == 80)
-  end)
+  end, "1.3.0")
 
   test("Get only ipv4 tcp adresses for luvit.io", function (print, p, expect, uv)
     assert(uv.getaddrinfo("luvit.io", nil, {
       socktype = "stream",
       family = "inet",
     }, expect(function (err, res)
+      if errorAllowed(err) then
+        print(err, "skipping")
+        return
+      end
       assert(not err, err)
       p(res, #res)
       assert(#res > 0)
@@ -26,12 +49,16 @@ return require('lib/tap')(function (test)
   end)
 
   -- FIXME: this test always fails on AppVeyor for some reason
-  if _G.isWindows and not os.getenv'APPVEYOR' then
+  if isWindows and not os.getenv'APPVEYOR' then
     test("Get only ipv6 tcp adresses for luvit.io", function (print, p, expect, uv)
       assert(uv.getaddrinfo("luvit.io", nil, {
         socktype = "stream",
         family = "inet6",
       }, expect(function (err, res)
+        if errorAllowed(err) then
+          print(err, "skipping")
+          return
+        end
         assert(not err, err)
         p(res, #res)
         assert(#res == 1)
@@ -43,6 +70,10 @@ return require('lib/tap')(function (test)
     assert(uv.getaddrinfo("luvit.io", nil, {
       socktype = "stream",
     }, expect(function (err, res)
+      if errorAllowed(err) then
+        print(err, "skipping")
+        return
+      end
       assert(not err, err)
       p(res, #res)
       assert(#res > 0)
@@ -51,6 +82,10 @@ return require('lib/tap')(function (test)
 
   test("Get all adresses for luvit.io", function (print, p, expect, uv)
     assert(uv.getaddrinfo("luvit.io", nil, nil, expect(function (err, res)
+      if errorAllowed(err) then
+        print(err, "skipping")
+        return
+      end
       assert(not err, err)
       p(res, #res)
       assert(#res > 0)
@@ -61,6 +96,10 @@ return require('lib/tap')(function (test)
     assert(uv.getnameinfo({
       family = "inet",
     }, expect(function (err, hostname, service)
+      if errorAllowed(err) then
+        print(err, "skipping")
+        return
+      end
       p{err=err,hostname=hostname,service=service}
       assert(not err, err)
       assert(hostname)
@@ -69,13 +108,17 @@ return require('lib/tap')(function (test)
   end)
 
   test("Lookup local ipv4 address sync", function (print, p, expect, uv)
-    local hostname, service = assert(uv.getnameinfo({
+    local hostname, service, err = uv.getnameinfo({
       family = "inet",
-    }))
+    })
+    if errorAllowed(err) then
+      print(err, "skipping")
+      return
+    end
     p{hostname=hostname,service=service}
     assert(hostname)
     assert(service)
-  end)
+  end, "1.3.0")
 
   test("Lookup local 127.0.0.1 ipv4 address", function (print, p, expect, uv)
     assert(uv.getnameinfo({

@@ -23,7 +23,11 @@ dependencies = {
 
 external_dependencies = {
   LIBUV = {
-    header = 'uv.h'
+    header = 'uv.h',
+    library = 'uv',
+  },
+  LUA_COMPAT53 = {
+    header = "compat-5.3.h"
   }
 }
 
@@ -34,7 +38,7 @@ build = {
     ['luv'] = {
       sources = {'src/luv.c'},
       libraries = {'uv'},
-      incdirs = {"$(LIBUV_INCDIR)","deps/lua-compat-5.3"},
+      incdirs = {"$(LIBUV_INCDIR)","$(LUA_COMPAT53_INCDIR)"},
       libdirs = {"$(LIBUV_LIBDIR)"}
     }
   };

@@ -34,7 +34,10 @@ option(LUAJIT_ENABLE_LUA52COMPAT "Enable Lua 5.2 compatibility." ON)
 option(LUAJIT_DISABLE_JIT "Disable JIT." OFF)
 option(LUAJIT_CPU_SSE2 "Use SSE2 instead of x87 instructions." ON)
 option(LUAJIT_CPU_NOCMOV "Disable NOCMOV." OFF)
-MARK_AS_ADVANCED(LUAJIT_DISABLE_FFI LUAJIT_ENABLE_LUA52COMPAT LUAJIT_DISABLE_JIT LUAJIT_CPU_SSE2 LUAJIT_CPU_NOCMOV)
+option(LUAJIT_DISABLE_GC64 "Disable GC64" OFF)
+MARK_AS_ADVANCED(LUAJIT_DISABLE_FFI LUAJIT_ENABLE_LUA52COMPAT
+  LUAJIT_DISABLE_GC64
+  LUAJIT_DISABLE_JIT LUAJIT_CPU_SSE2 LUAJIT_CPU_NOCMOV)
 
 IF(LUAJIT_DISABLE_FFI)
   ADD_DEFINITIONS(-DLUAJIT_DISABLE_FFI)
@@ -42,6 +45,10 @@ ENDIF()
 
 IF(LUAJIT_ENABLE_LUA52COMPAT)
   ADD_DEFINITIONS(-DLUAJIT_ENABLE_LUA52COMPAT)
+ENDIF()
+
+IF(LUAJIT_DISABLE_GC64)
+  ADD_DEFINITIONS(-DLUAJIT_DISABLE_GC64)
 ENDIF()
 
 IF(LUAJIT_DISABLE_JIT)
@@ -184,9 +191,6 @@ IF(TARGET_LJARCH STREQUAL "x86")
     SET(DASM_FLAGS ${DASM_FLAGS} -D SSE)
   ENDIF()
 ENDIF()
-IF(TARGET_LJARCH STREQUAL "x64")
-  SET(DASM_ARCH "x86")
-ENDIF()
 IF(TARGET_LJARCH STREQUAL "ppc")
   LJ_TEST_ARCH_VALUE(LJ_ARCH_SQRT 1)
   IF(NOT LJ_ARCH_SQRT_1)
@@ -302,6 +306,15 @@ IF(WIN32)
 ELSE()
   IF(WITH_AMALG)
     add_executable(luajit ${LUAJIT_DIR}/src/luajit.c ${LUAJIT_DIR}/src/ljamalg.c ${DEPS})
+    # When using WITH_AMALG during a parallel build, its possible to run into
+    # false-positive "error: 'fold_hash' undeclared" compile errors due to a weird interaction
+    # when building two ljamalg.c at the same time.
+    #
+    # This adds a fake dependency from one to the other, forcing the build process to
+    # compile them sequentially rather than parallel.
+    #
+    # See https://github.com/torch/luajit-rocks/issues/39
+    add_dependencies(luajit luajit-5.1)
   ELSE()
     add_executable(luajit ${LUAJIT_DIR}/src/luajit.c ${SRC_LJCORE} ${DEPS})
   ENDIF()

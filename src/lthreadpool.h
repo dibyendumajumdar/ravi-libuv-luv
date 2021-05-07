@@ -22,22 +22,31 @@
 #define LUV_THREAD_MAXNUM_ARG 9
 
 typedef struct {
-  /* only support LUA_TNIL, LUA_TBOOLEAN, LUA_TLIGHTUSERDATA, LUA_TNUMBER, LUA_TSTRING*/
+  // support basic lua type LUA_TNIL, LUA_TBOOLEAN, LUA_TNUMBER, LUA_TSTRING
+  // and support uv_handle_t userdata
   int type;
   union
   {
     lua_Number num;
     int boolean;
-    void* userdata;
     struct {
       const char* base;
       size_t len;
     } str;
+    struct {
+      const void* data;
+      size_t size;
+      const char* metaname;
+    } udata;
   } val;
+  int ref[2];          // ref of string or userdata
 } luv_val_t;
 
 typedef struct {
   int argc;
+  int flags;          // control gc
+
+  lua_State *L;
   luv_val_t argv[LUV_THREAD_MAXNUM_ARG];
 } luv_thread_arg_t;
 
@@ -46,11 +55,11 @@ typedef struct {
 #define LUA_OK 0
 #endif
 
-//LUV flags thread support userdata handle
-#define LUVF_THREAD_UHANDLE 1    
-
-static int luv_thread_arg_set(lua_State* L, luv_thread_arg_t* args, int idx, int top, int flags);
-static int luv_thread_arg_push(lua_State* L, const luv_thread_arg_t* args, int flags);
-static void luv_thread_arg_clear(lua_State* L, luv_thread_arg_t* args, int flags);
+//LUV flags for thread or threadpool args
+#define LUVF_THREAD_SIDE_MAIN      0x00
+#define LUVF_THREAD_SIDE_CHILD     0x01
+#define LUVF_THREAD_MODE_ASYNC     0x02
+#define LUVF_THREAD_SIDE(i)        ((i)&0x01)
+#define LUVF_THREAD_ASYNC(i)       ((i)&0x02)
 
 #endif //LUV_LTHREADPOOL_H

@@ -12,6 +12,14 @@ else
   usecolors = false
 end
 
+if _G.jit and _G.jit.os then
+  -- Luajit provides explicit platform detection
+  utils.isWindows = _G.jit.os == "Windows"
+else
+  -- Normal lua will only have \ for path separator on windows.
+  utils.isWindows = package.config:find("\\") and true or false
+end
+
 local colors = {
   black   = "0;30",
   red     = "0;31",
@@ -159,6 +167,20 @@ function utils.prettyPrint(...)
   end
 
   print(table.concat(arguments, "\t"))
+end
+
+function utils.uvVersionGEQ(min_version)
+  if not min_version then return true end
+  local min_version_num = min_version
+  if type(min_version) == "string" then
+    local version_parts = {}
+    for part in min_version:gmatch("%d+") do
+      table.insert(version_parts, tonumber(part))
+    end
+    assert(#version_parts == 3, "malformed version string: " .. min_version)
+    min_version_num = version_parts[1]*0x10000 + version_parts[2]*0x100 + version_parts[3]
+  end
+  return uv.version() >= min_version_num
 end
 
 return utils

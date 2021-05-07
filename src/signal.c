@@ -14,7 +14,7 @@
  *  limitations under the License.
  *
  */
-#include "luv.h"
+#include "private.h"
 
 static uv_signal_t* luv_check_signal(lua_State* L, int index) {
   uv_signal_t* handle = (uv_signal_t*)luv_checkudata(L, index, "uv_signal");
@@ -23,19 +23,20 @@ static uv_signal_t* luv_check_signal(lua_State* L, int index) {
 }
 
 static int luv_new_signal(lua_State* L) {
+  luv_ctx_t* ctx = luv_context(L);
   uv_signal_t* handle = (uv_signal_t*)luv_newuserdata(L, sizeof(*handle));
-  int ret = uv_signal_init(luv_loop(L), handle);
+  int ret = uv_signal_init(ctx->loop, handle);
   if (ret < 0) {
     lua_pop(L, 1);
     return luv_error(L, ret);
   }
-  handle->data = luv_setup_handle(L);
+  handle->data = luv_setup_handle(L, ctx);
   return 1;
 }
 
 static void luv_signal_cb(uv_signal_t* handle, int signum) {
-  lua_State* L = luv_state(handle->loop);
   luv_handle_t* data = (luv_handle_t*)handle->data;
+  lua_State* L = data->ctx->L;
   lua_pushstring(L, luv_sig_num_to_string(signum));
   luv_call_callback(L, data, LUV_SIGNAL, 1);
 }
@@ -58,40 +59,34 @@ static int luv_signal_start(lua_State* L) {
     luv_check_callback(L, (luv_handle_t*)handle->data, LUV_SIGNAL, 3);
   }
   ret = uv_signal_start(handle, luv_signal_cb, signum);
-  if (ret < 0) return luv_error(L, ret);
-  lua_pushinteger(L, ret);
-  return 1;
+  return luv_result(L, ret);
 }
 
 #if LUV_UV_VERSION_GEQ(1, 12, 0)
 static int luv_signal_start_oneshot(lua_State* L) {
-	uv_signal_t* handle = luv_check_signal(L, 1);
-	int signum, ret;
-	if (lua_isnumber(L, 2)) {
-		signum = lua_tointeger(L, 2);
-	}
-	else if (lua_isstring(L, 2)) {
-		signum = luv_sig_string_to_num(luaL_checkstring(L, 2));
-		luaL_argcheck(L, signum, 2, "Invalid Signal name");
-	}
-	else {
-		return luaL_argerror(L, 2, "Missing Signal name");
-	}
+  uv_signal_t* handle = luv_check_signal(L, 1);
+  int signum, ret;
+  if (lua_isnumber(L, 2)) {
+    signum = lua_tointeger(L, 2);
+  }
+  else if (lua_isstring(L, 2)) {
+    signum = luv_sig_string_to_num(luaL_checkstring(L, 2));
+    luaL_argcheck(L, signum, 2, "Invalid Signal name");
+  }
+  else {
+    return luaL_argerror(L, 2, "Missing Signal name");
+  }
 
-	if (!lua_isnoneornil(L, 3)) {
-		luv_check_callback(L, (luv_handle_t*)handle->data, LUV_SIGNAL, 3);
-	}
-	ret = uv_signal_start_oneshot(handle, luv_signal_cb, signum);
-	if (ret < 0) return luv_error(L, ret);
-	lua_pushinteger(L, ret);
-	return 1;
+  if (!lua_isnoneornil(L, 3)) {
+    luv_check_callback(L, (luv_handle_t*)handle->data, LUV_SIGNAL, 3);
+  }
+  ret = uv_signal_start_oneshot(handle, luv_signal_cb, signum);
+  return luv_result(L, ret);
 }
 #endif
 
 static int luv_signal_stop(lua_State* L) {
   uv_signal_t* handle = luv_check_signal(L, 1);
   int ret = uv_signal_stop(handle);
-  if (ret < 0) return luv_error(L, ret);
-  lua_pushinteger(L, ret);
-  return 1;
+  return luv_result(L, ret);
 }

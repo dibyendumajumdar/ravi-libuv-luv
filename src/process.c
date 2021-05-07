@@ -14,7 +14,7 @@
  *  limitations under the License.
  *
  */
-#include "luv.h"
+#include "private.h"
 #include <math.h>
 
 static int luv_disable_stdio_inheritance(lua_State* L) {
@@ -30,22 +30,30 @@ static uv_process_t* luv_check_process(lua_State* L, int index) {
 }
 
 static void exit_cb(uv_process_t* handle, int64_t exit_status, int term_signal) {
-  lua_State* L = luv_state(handle->loop);
   luv_handle_t* data = (luv_handle_t*)handle->data;
+  lua_State* L = data->ctx->L;
   lua_pushinteger(L, exit_status);
   lua_pushinteger(L, term_signal);
   luv_call_callback(L, data, LUV_EXIT, 2);
 }
 
 static void luv_spawn_close_cb(uv_handle_t* handle) {
-  lua_State *L = luv_state(handle->loop);
+  luv_handle_t* data = (luv_handle_t*)handle->data;
+  lua_State* L = data->ctx->L;
   luv_unref_handle(L, (luv_handle_t*)handle->data);
 }
 
-static void luv_clean_options(uv_process_options_t* options) {
+static void luv_clean_options(lua_State* L, uv_process_options_t* options, int* args_refs) {
   free(options->args);
   free(options->stdio);
   free(options->env);
+  if (args_refs) {
+    int i;
+    for (i = 0; args_refs[i] != LUA_NOREF; i++) {
+      luaL_unref(L, LUA_REGISTRYINDEX, args_refs[i]);
+    }
+    free(args_refs);
+  }
 }
 
 // iterates over the tbl to find the max integer
@@ -74,8 +82,10 @@ static int sparse_rawlen(lua_State* L, int tbl) {
 static int luv_spawn(lua_State* L) {
   uv_process_t* handle;
   uv_process_options_t options;
+  int* args_refs = NULL;
   size_t i, len = 0;
   int ret;
+  luv_ctx_t* ctx = luv_context(L);
 
   memset(&options, 0, sizeof(options));
   options.exit_cb = exit_cb;
@@ -92,7 +102,7 @@ static int luv_spawn(lua_State* L) {
     len = 1 + lua_rawlen(L, -1);
   }
   else if (lua_type(L, -1) != LUA_TNIL) {
-    luv_clean_options(&options);
+    luv_clean_options(L, &options, args_refs);
     return luaL_argerror(L, 3, "args option must be table");
   }
   else {
@@ -100,18 +110,30 @@ static int luv_spawn(lua_State* L) {
   }
   // +1 for null terminator at end
   options.args = (char**)malloc((len + 1) * sizeof(*options.args));
-  if (!options.args) {
-    luv_clean_options(&options);
+
+  // args must be referenced to ensure that they don't get garbage
+  // collected between now and when they are used in uv_spawn.
+  // However, we don't need to ref args[0] since we don't pop that
+  // from the stack. Note: args_refs is a LUA_NOREF-terminated array
+  // when it is non-NULL 
+  if (len > 1) {
+    args_refs = (int*)malloc(len * sizeof(int));
+    if (args_refs)
+      args_refs[len-1] = LUA_NOREF;
+  }
+
+  if (!options.args || (len > 1 && !args_refs)) {
+    luv_clean_options(L, &options, args_refs);
     return luaL_error(L, "Problem allocating args");
   }
   options.args[0] = (char*)options.file;
   for (i = 1; i < len; ++i) {
     lua_rawgeti(L, -1, i);
     options.args[i] = (char*)lua_tostring(L, -1);
-    lua_pop(L, 1);
+    args_refs[i - 1] = luaL_ref(L, LUA_REGISTRYINDEX);
   }
   options.args[len] = NULL;
-  lua_pop(L, 1);
+  lua_pop(L, 1); // pop the args field (either table or nil)
 
   // get the stdio list
   lua_getfield(L, 2, "stdio");
@@ -119,7 +141,7 @@ static int luv_spawn(lua_State* L) {
     options.stdio_count = len = sparse_rawlen(L, -1);
     options.stdio = (uv_stdio_container_t*)malloc(len * sizeof(*options.stdio));
     if (!options.stdio) {
-      luv_clean_options(&options);
+      luv_clean_options(L, &options, args_refs);
       return luaL_error(L, "Problem allocating stdio");
     }
     for (i = 0; i < len; ++i) {
@@ -153,14 +175,14 @@ static int luv_spawn(lua_State* L) {
         options.stdio[i].flags = UV_IGNORE;
       }
       else {
-        luv_clean_options(&options);
+        luv_clean_options(L, &options, args_refs);
         return luaL_argerror(L, 2, "stdio table entries must be nil, uv_stream_t, or integer");
       }
       lua_pop(L, 1);
     }
   }
   else if (lua_type(L, -1) != LUA_TNIL) {
-    luv_clean_options(&options);
+    luv_clean_options(L, &options, args_refs);
     return luaL_argerror(L, 2, "stdio option must be table");
   }
   lua_pop(L, 1);
@@ -171,7 +193,7 @@ static int luv_spawn(lua_State* L) {
     len = lua_rawlen(L, -1);
     options.env = (char**)malloc((len + 1) * sizeof(*options.env));
     if (!options.env) {
-      luv_clean_options(&options);
+      luv_clean_options(L, &options, args_refs);
       return luaL_error(L, "Problem allocating env");
     }
     for (i = 0; i < len; ++i) {
@@ -182,7 +204,7 @@ static int luv_spawn(lua_State* L) {
     options.env[len] = NULL;
   }
   else if (lua_type(L, -1) != LUA_TNIL) {
-    luv_clean_options(&options);
+    luv_clean_options(L, &options, args_refs);
     return luaL_argerror(L, 2, "env option must be table");
   }
   lua_pop(L, 1);
@@ -193,7 +215,7 @@ static int luv_spawn(lua_State* L) {
     options.cwd = (char*)lua_tostring(L, -1);
   }
   else if (lua_type(L, -1) != LUA_TNIL) {
-    luv_clean_options(&options);
+    luv_clean_options(L, &options, args_refs);
     return luaL_argerror(L, 2, "cwd option must be string");
   }
   lua_pop(L, 1);
@@ -205,7 +227,7 @@ static int luv_spawn(lua_State* L) {
     options.flags |= UV_PROCESS_SETUID;
   }
   else if (lua_type(L, -1) != LUA_TNIL) {
-    luv_clean_options(&options);
+    luv_clean_options(L, &options, args_refs);
     return luaL_argerror(L, 2, "uid option must be number");
   }
   lua_pop(L, 1);
@@ -217,7 +239,7 @@ static int luv_spawn(lua_State* L) {
     options.flags |= UV_PROCESS_SETGID;
   }
   else if (lua_type(L, -1) != LUA_TNIL) {
-    luv_clean_options(&options);
+    luv_clean_options(L, &options, args_refs);
     return luaL_argerror(L, 2, "gid option must be number");
   }
   lua_pop(L, 1);
@@ -238,18 +260,34 @@ static int luv_spawn(lua_State* L) {
     options.flags |= UV_PROCESS_WINDOWS_HIDE;
   }
   lua_pop(L, 1);
+#if LUV_UV_VERSION_GEQ(1, 24, 0)
+  lua_getfield(L, 2, "hide_console");
+  if (lua_toboolean(L, -1)) {
+    options.flags |= UV_PROCESS_WINDOWS_HIDE_CONSOLE;
+  }
+  lua_pop(L, 1);
+  lua_getfield(L, 2, "hide_gui");
+  if (lua_toboolean(L, -1)) {
+    options.flags |= UV_PROCESS_WINDOWS_HIDE_GUI;
+  }
+  lua_pop(L, 1);
+#endif
+
+  // this will fill the 3rd argument with nil if it doesn't exist so that
+  // the uv_process_t userdata doesn't get treated as the 3rd argument
+  lua_settop(L, 3);
 
   handle = (uv_process_t*)luv_newuserdata(L, sizeof(*handle));
   handle->type = UV_PROCESS;
-  handle->data = luv_setup_handle(L);
+  handle->data = luv_setup_handle(L, ctx);
 
   if (!lua_isnoneornil(L, 3)) {
     luv_check_callback(L, (luv_handle_t*)handle->data, LUV_EXIT, 3);
   }
 
-  ret = uv_spawn(luv_loop(L), handle, &options);
+  ret = uv_spawn(ctx->loop, handle, &options);
 
-  luv_clean_options(&options);
+  luv_clean_options(L, &options, args_refs);
   if (ret < 0) {
     /* The async callback is required here because luajit GC may reclaim the
      * luv handle before libuv is done closing it down.
@@ -275,16 +313,20 @@ static int luv_process_kill(lua_State* L) {
   uv_process_t* handle = luv_check_process(L, 1);
   int signum = luv_parse_signal(L, 2);
   int ret = uv_process_kill(handle, signum);
-  if (ret < 0) return luv_error(L, ret);
-  lua_pushinteger(L, ret);
-  return 1;
+  return luv_result(L, ret);
 }
 
 static int luv_kill(lua_State* L) {
   int pid = luaL_checkinteger(L, 1);
   int signum = luv_parse_signal(L, 2);
   int ret = uv_kill(pid, signum);
-  if (ret < 0) return luv_error(L, ret);
-  lua_pushinteger(L, ret);
+  return luv_result(L, ret);
+}
+
+#if LUV_UV_VERSION_GEQ(1, 19, 0)
+static int luv_process_get_pid(lua_State* L) {
+  uv_process_t* handle = luv_check_process(L, 1);
+  lua_pushinteger(L, uv_process_get_pid(handle));
   return 1;
 }
+#endif

@@ -14,7 +14,7 @@
  *  limitations under the License.
  *
  */
-#include "luv.h"
+#include "private.h"
 
 static uv_tty_t* luv_check_tty(lua_State* L, int index) {
   uv_tty_t* handle = (uv_tty_t*)luv_checkudata(L, index, "uv_tty");
@@ -25,16 +25,17 @@ static uv_tty_t* luv_check_tty(lua_State* L, int index) {
 static int luv_new_tty(lua_State* L) {
   int readable, ret;
   uv_tty_t* handle;
+  luv_ctx_t* ctx = luv_context(L);
   uv_file fd = luaL_checkinteger(L, 1);
   luaL_checktype(L, 2, LUA_TBOOLEAN);
   readable = lua_toboolean(L, 2);
   handle = (uv_tty_t*)luv_newuserdata(L, sizeof(*handle));
-  ret = uv_tty_init(luv_loop(L), handle, fd, readable);
+  ret = uv_tty_init(ctx->loop, handle, fd, readable);
   if (ret < 0) {
     lua_pop(L, 1);
     return luv_error(L, ret);
   }
-  handle->data = luv_setup_handle(L);
+  handle->data = luv_setup_handle(L, ctx);
   return 1;
 }
 
@@ -42,16 +43,12 @@ static int luv_tty_set_mode(lua_State* L) {
   uv_tty_t* handle = luv_check_tty(L, 1);
   int mode = luaL_checkinteger(L, 2);
   int ret = uv_tty_set_mode(handle, mode);
-  if (ret < 0) return luv_error(L, ret);
-  lua_pushinteger(L, ret);
-  return 1;
+  return luv_result(L, ret);
 }
 
 static int luv_tty_reset_mode(lua_State* L) {
   int ret = uv_tty_reset_mode();
-  if (ret < 0) return luv_error(L, ret);
-  lua_pushinteger(L, ret);
-  return 1;
+  return luv_result(L, ret);
 }
 
 static int luv_tty_get_winsize(lua_State* L) {
@@ -63,3 +60,37 @@ static int luv_tty_get_winsize(lua_State* L) {
   lua_pushinteger(L, height);
   return 2;
 }
+
+#if LUV_UV_VERSION_GEQ(1, 33, 0)
+int luv_tty_set_vterm_state(lua_State* L)
+{
+  uv_tty_vtermstate_t state[] = {UV_TTY_SUPPORTED, UV_TTY_UNSUPPORTED};
+  const char* option[] = {"supported", "unsupported", NULL};
+  int idx = luaL_checkoption (L, 1, NULL, option);
+  uv_tty_set_vterm_state(state[idx]);
+  return 0;
+}
+
+int luv_tty_get_vterm_state(lua_State* L)
+{
+  uv_tty_vtermstate_t state;
+  int ret = uv_tty_get_vterm_state(&state);
+  if (ret < 0) return luv_error(L, ret);
+  switch (state)
+  {
+    case UV_TTY_SUPPORTED:
+      lua_pushliteral(L, "supported");
+      ret = 1;
+      break;
+    case UV_TTY_UNSUPPORTED:
+      lua_pushliteral(L, "unsupported");
+      ret = 1;
+      break;
+    default:
+      ret = luaL_error(L, "unexpected uv_tty_vtermstate: %d", state);
+  }
+  return ret;
+}
+
+#endif
+

@@ -2,20 +2,23 @@ luv
 ===
 
 [![Linux Build Status](https://travis-ci.org/luvit/luv.svg?branch=master)](https://travis-ci.org/luvit/luv)
-
 [![Windows Build status](https://ci.appveyor.com/api/projects/status/uo1qhdcc0vcqsiok/branch/master?svg=true)](https://ci.appveyor.com/project/racker-buildbot/luv/branch/master)
+[![Code Quality: Cpp](https://img.shields.io/lgtm/grade/cpp/g/luvit/luv.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/luvit/luv/context:cpp)
+[![Total Alerts](https://img.shields.io/lgtm/alerts/g/luvit/luv.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/luvit/luv/alerts)
 
 [libuv](https://github.com/libuv/libuv) bindings for
 [luajit](http://luajit.org/) and [lua](http://www.lua.org/)
 [5.1](http://www.lua.org/manual/5.1/manual.html)/
 [5.2](http://www.lua.org/manual/5.2/manual.html)/
-[5.3](http://www.lua.org/manual/5.3/manual.html).
+[5.3](http://www.lua.org/manual/5.3/manual.html)/
+[5.4](http://www.lua.org/manual/5.4/manual.html).
 
 This library makes libuv available to lua scripts.  It was made for the [luvit](http://luvit.io/) project but should usable from nearly any lua project.
 
 The library can be used by multiple threads at once.  Each thread is assumed to load the library from a different `lua_State`.  Luv will create a unique `uv_loop_t` for each state.  You can't share uv handles between states/loops.
 
-The best docs currently are the [libuv docs](http://docs.libuv.org/) themselves.  Hopfully soon we'll have a copy locally tailored for lua.
+- [Luv docs](docs.md)
+- [Libuv docs](http://docs.libuv.org/)
 
 ```lua
 local uv = require('luv')
@@ -161,9 +164,9 @@ On unix systems, use the Makefile.
 This will build luv as a module library. Module libraries are plugins that are
 not linked into other targets.
 
-#### Build with PUC Lua 5.3
-By default luv is linked with LuaJIT 2.0.4. If you rather like to link luv
-with PUC Lua 5.3 you can run make with:
+#### Build with PUC Lua 5.4
+By default luv is linked with LuaJIT 2.1.0-beta3. If you rather like to link luv
+with PUC Lua 5.4 you can run make with:
 
 ```
 ~/Code/luv> WITH_LUA_ENGINE=Lua make
@@ -174,10 +177,10 @@ with PUC Lua 5.3 you can run make with:
 If you want to build luv as a static library run make with:
 
 ```
-~/Code/luv> BUILD_MODULE=OFF make
+~/Code/luv> BUILD_MODULE=OFF BUILD_STATIC_LIBS=ON make
 ```
 
-This will create a static library `libluv.a`.
+This will create a static library `libluv_a.a`.
 
 #### Build as shared library
 
